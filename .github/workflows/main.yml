@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - Build and Test Docker Image
+name: CI/CD Pipeline - Build, Test, and Deploy Docker Image
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
 
       - name: Install DVC
         run: |
-          pip install dvc[all]  # Install DVC with all dependencies
+          pip install dvc[all]
 
       - name: Set up AWS credentials for DVC
         env:
@@ -34,20 +34,39 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          # Configure DVC to use AWS S3 remote storage
-          dvc remote add -d origin $S3_URI  # Add the S3 URI as the default remote storage
-          dvc remote modify origin access_key_id $AWS_ACCESS_KEY_ID  # Set AWS Access Key ID
-          dvc remote modify origin secret_access_key $AWS_SECRET_ACCESS_KEY  # Set AWS Secret Access Key
-          dvc remote modify origin region $AWS_REGION  # Set AWS Region
+          dvc init
+          dvc remote add -d origin $S3_URI
+          dvc remote modify origin access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin region $AWS_REGION
 
       - name: Pull DVC datasets
         run: |
-          dvc pull  # Pull datasets from the configured remote storage (AWS S3)
+          dvc pull
 
       - name: Run tests
         run: |
-          pytest --maxfail=1 --disable-warnings -q  # Run tests
+          pytest --maxfail=1 --disable-warnings -q
 
       - name: Build Docker image
         run: |
-          docker build -t hybrid-recommender-system:latest .  # Build Docker image
+          docker build -t hybrid-recommender-system:latest .
+
+      - name: Run tests on Docker image
+        run: |
+          docker run --rm hybrid-recommender-system:latest pytest --maxfail=1 --disable-warnings -q
+
+      - name: Log in to Docker Hub with Access Token
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }} # Your Docker Hub username
+          password: ${{ secrets.DOCKER_PASSWORD }} # Your Docker Hub Access Token
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker tag hybrid-recommender-system:latest ${{ secrets.DOCKER_USERNAME }}/hybrid-recommender-system:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/hybrid-recommender-system:latest
+
+      - name: Clean up Docker images
+        run: |
+          docker rmi hybrid-recommender-system:latest
