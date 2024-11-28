@@ -34,9 +34,6 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
         run: |
-          # Initialize DVC in the repository if it's not already initialized
-          dvc init  # This only runs if DVC is not yet initialized
-
           # Configure DVC to use AWS S3 remote storage
           dvc remote add -d origin $S3_URI  # Add the S3 URI as the default remote storage
           dvc remote modify origin access_key_id $AWS_ACCESS_KEY_ID  # Set AWS Access Key ID
