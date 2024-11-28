@@ -1,0 +1,51 @@
+name: CI/CD Pipeline - Build and Test Docker Image
+
+on:
+  push:
+    branches:
+      - master  # Trigger on push to the main branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install DVC
+        run: |
+          pip install dvc[all]  # Install DVC with all dependencies
+
+      - name: Set up AWS credentials for DVC
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          # Configure DVC to use AWS credentials
+          dvc remote modify myremote access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify myremote secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify myremote region $AWS_REGION
+
+      - name: Pull DVC datasets
+        run: |
+          dvc pull  # Pull datasets from the configured remote storage (AWS S3)
+
+      - name: Run tests
+        run: |
+          pytest --maxfail=1 --disable-warnings -q  # Run tests
+
+      - name: Build Docker image
+        run: |
+          docker build -t hybrid-recommender-system:latest .  # Build Docker image
